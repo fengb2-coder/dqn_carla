@@ -166,7 +166,7 @@ class CarEnv:
             elif kmh < 50:
                 done = False
                 reward = -1
-            elif carla.Location.distance(self, self.filtered_waypoints[i]) == 0:
+            elif carla.Location(self, self.filtered_waypoints[i].transform.location).distance(self, carla.Location) == 0:
                 done = False
                 reward = 150
             else:

@@ -28,7 +28,7 @@ import carla
 
 IM_WIDTH = 640
 IM_HEIGHT = 480
-SECONDS_PER_EPISODE = 15
+SECONDS_PER_EPISODE = 40
 REPLAY_MEMORY_SIZE = 5_000
 
 MIN_REPLAY_MEMORY_SIZE = 1_000
@@ -63,16 +63,42 @@ class CarEnv:
     def __init__(self):
         self.client = carla.Client('localhost', 2000)
         self.client.set_timeout(2.0)
-        self.world = self.client.get_world()
+        self.world = self.client.load_world('Town01')
+        self.map = self.world.get_map()   ## added for map creating
         self.blueprint_library = self.world.get_blueprint_library()
 
         self.model_3 = self.blueprint_library.filter("model3")[0]  ## grab tesla model3 from library
 
+
+            
+
     def reset(self):
         self.collision_hist = []    
         self.actor_list = []
-        self.transform = random.choice(self.world.get_map().get_spawn_points())
-        self.vehicle = self.world.spawn_actor(self.model_3, self.transform)
+
+        self.waypoints = self.client.get_world().get_map().generate_waypoints(distance=3.0)
+
+        self.filtered_waypoints = []   ## chaned
+        i = 0
+        for self.waypoint in self.waypoints:
+            if(self.waypoint.road_id == 10):
+                self.filtered_waypoints.append(self.waypoint)
+                for i in range(len(self.filtered_waypoints)):
+                    self.world.debug.draw_string(self.filtered_waypoints[i].transform.location, 'O', draw_shadow=False,
+                                   color=carla.Color(r=0, g=255, b=0), life_time=40,
+                                   persistent_lines=True)
+                    i = i+1
+
+        self.spawn_point = self.filtered_waypoints[4].transform
+
+        self.spawn_point.location.z += 2
+        
+
+
+        # self.spawn_points = world.get_map().get_spawn_points()
+        # self.waypoint_list = self.map.generate_waypoints(2.0)   ## changed for getting waypoints
+        # self.transform = random.choice(self.world.get_map().get_spawn_points())
+        self.vehicle = self.world.spawn_actor(self.model_3, self.spawn_point)  ## changed for adding waypoints
         self.actor_list.append(self.vehicle)
 
         self.rgb_cam = self.blueprint_library.find('sensor.camera.rgb')
@@ -121,29 +147,37 @@ class CarEnv:
         0, 1, 2
         '''
         if action == 0:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=-1*self.STEER_AMT))
-        if action == 1:
             self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer= 0 ))
+            
+        if action == 1:
+            self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=-1*self.STEER_AMT))
         if action == 2:
             self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=1*self.STEER_AMT))
 
         v = self.vehicle.get_velocity()
         kmh = int(3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2))
+        i = 5
+        for i in range(len(self.filtered_waypoints)):
 
-        if len(self.collision_hist) != 0:
-            done = True
-            reward = -200
-        elif kmh < 50:
-            done = False
-            reward = -1
-        else:
-            done = False
-            reward = 5
 
-        if self.episode_start + SECONDS_PER_EPISODE < time.time():  ## when to stop
-            done = True
+            if len(self.collision_hist) != 0:
+                done = True
+                reward = -200
+            elif kmh < 50:
+                done = False
+                reward = -1
+            elif carla.Location.distance(self, self.filtered_waypoints[i]) == 0:
+                done = False
+                reward = 150
+            else:
+                done = False
+                reward = 10
+            i = i + 1
 
-        return self.front_camera, reward, done, None
+            if self.episode_start + SECONDS_PER_EPISODE < time.time():  ## when to stop
+                done = True
+
+            return self.front_camera, reward, done, None
 
 
 

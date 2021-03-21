@@ -71,7 +71,7 @@ if __name__ == '__main__':
             # Measure step time, append to a deque, then print mean FPS for last 60 frames, q values and taken action
             frame_time = time.time() - step_start
             fps_counter.append(frame_time)
-            print(f'Agent: {len(fps_counter)/sum(fps_counter):>4.1f} FPS | Action: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}] {action}')
+           
 
         # Destroy an actor at end of episode
         for actor in env.actor_list:

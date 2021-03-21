@@ -28,14 +28,14 @@ import carla
 
 IM_WIDTH = 640
 IM_HEIGHT = 480
-SECONDS_PER_EPISODE = 40
+SECONDS_PER_EPISODE = 20
 REPLAY_MEMORY_SIZE = 5_000
 
 MIN_REPLAY_MEMORY_SIZE = 1_000
 MINIBATCH_SIZE = 16
 PREDICTION_BATCH_SIZE = 1
 TRAINING_BATCH_SIZE = MINIBATCH_SIZE // 4
-UPDATE_TARGET_EVERY = 10
+UPDATE_TARGET_EVERY = 5  #used to be 10
 MODEL_NAME = "Xception"
 
 MEMORY_FRACTION = 0.8
@@ -43,15 +43,15 @@ MIN_REWARD = -200
 
 
 
-EPISODES = 100
+EPISODES = 50
 
 DISCOUNT = 0.99
 epsilon = 1
 EPSILON_DECAY = 0.95 ## 0.9975 99975
 MIN_EPSILON = 0.001
 
-AGGREGATE_STATS_EVERY = 5  ## checking per 10 episodes
-SHOW_PREVIEW  = False    ## for debugging purpose
+AGGREGATE_STATS_EVERY = 5  ## checking per 5 episodes
+SHOW_PREVIEW  = True    ## for debugging purpose
 
 class CarEnv:
     SHOW_CAM = SHOW_PREVIEW
@@ -63,9 +63,17 @@ class CarEnv:
     def __init__(self):
         self.client = carla.Client('localhost', 2000)
         self.client.set_timeout(2.0)
-        self.world = self.client.load_world('Town01')
+        # self.actor = carla.Actor
+        self.world = self.client.load_world('Town03')
         self.map = self.world.get_map()   ## added for map creating
         self.blueprint_library = self.world.get_blueprint_library()
+
+        weather = carla.WeatherParameters(
+            cloudyness=10.0,
+            precipitation=10.0,
+            sun_altitude_angle=90.0)
+
+        self.world.set_weather(weather)
 
         self.model_3 = self.blueprint_library.filter("model3")[0]  ## grab tesla model3 from library
 
@@ -75,6 +83,9 @@ class CarEnv:
     def reset(self):
         self.collision_hist = []    
         self.actor_list = []
+        
+
+
 
         self.waypoints = self.client.get_world().get_map().generate_waypoints(distance=3.0)
 
@@ -89,16 +100,37 @@ class CarEnv:
                                    persistent_lines=True)
                     i = i+1
 
-        self.spawn_point = self.filtered_waypoints[4].transform
+        self.spawn_point = self.filtered_waypoints[1].transform
 
         self.spawn_point.location.z += 2
+        self.vehicle = self.world.spawn_actor(self.model_3, self.spawn_point)  ## changed for adding waypoints
+
+
+
+
+
+        # self.spawn_points = self.map.get_spawn_points()
+
+        # self.vehicle = self.world.spawn_actor(self.model_3, self.spawn_points)  ## changed for adding waypoints
+
+        # self.waypoint = self.map.get_waypoint(self.vehicle.get_location())
+        # self.vehicle.set_simulate_physics(False)
+
+        # self.world.debug.draw_string(self.waypoint.transform.location, 'O', draw_shadow=False,
+        #                            color=carla.Color(r=0, g=255, b=0), life_time=40,
+        #                            persistent_lines=True)
+        # while True:
+        #     # Find next waypoint 2 meters ahead.
+        #     self.waypoint = random.choice(self.waypoint.next(20.0))
+        #     # Teleport the vehicle.
+        #     self.vehicle.set_transform(self.waypoint.transform)
+
+        # self.transform = random.choice(self.world.get_map().get_spawn_points())
+        # self.vehicle = self.world.spawn_actor(self.model_3, self.transform)
         
 
 
-        # self.spawn_points = world.get_map().get_spawn_points()
-        # self.waypoint_list = self.map.generate_waypoints(2.0)   ## changed for getting waypoints
-        # self.transform = random.choice(self.world.get_map().get_spawn_points())
-        self.vehicle = self.world.spawn_actor(self.model_3, self.spawn_point)  ## changed for adding waypoints
+        
         self.actor_list.append(self.vehicle)
 
         self.rgb_cam = self.blueprint_library.find('sensor.camera.rgb')
@@ -147,31 +179,52 @@ class CarEnv:
         0, 1, 2
         '''
         if action == 0:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer= 0 ))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer= 0.0 ))
             
         if action == 1:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=-1*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=1.0*self.STEER_AMT))
         if action == 2:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=1*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=-1.0*self.STEER_AMT))
 
         v = self.vehicle.get_velocity()
         kmh = int(3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2))
-        i = 5
-        for i in range(len(self.filtered_waypoints)):
+      
+        
+
+
+        # if len(self.collision_hist) != 0:
+        #         done = True
+        #         reward = -200
+        # elif kmh < 50:
+        #         done = False
+        #         reward = -1
+        # elif carla.Location.distance(self, self.waypoint) == 0:
+        #         done = False
+        #         reward = 150
+        # else:
+        #         done = False
+        #         reward = 10
+
+        # if self.episode_start + SECONDS_PER_EPISODE < time.time():  ## when to stop
+        #         done = True
+
+        # return self.front_camera, reward, done, None
+        i = 2
+        for i in range(2, len(self.filtered_waypoints)):
 
 
             if len(self.collision_hist) != 0:
                 done = True
-                reward = -200
-            elif kmh < 50:
+                reward = -300
+            elif kmh < 30:
                 done = False
-                reward = -1
-            elif carla.Location(self, self.filtered_waypoints[i].transform.location).distance(self, carla.Location) == 0:
+                reward = -5
+            elif carla.Location.distance(carla.Actor.get_location(self.actor_list[0]), self.filtered_waypoints[i].transform.location) == 0:
                 done = False
-                reward = 150
+                reward = 25
             else:
                 done = False
-                reward = 10
+                reward = 30
             i = i + 1
 
             if self.episode_start + SECONDS_PER_EPISODE < time.time():  ## when to stop
@@ -440,7 +493,7 @@ if __name__ == '__main__':
                 agent.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=epsilon)
 
                 # Save model, but only when min reward is greater or equal a set value
-                if average_reward >= -200:
+                if average_reward >= -100:
                     agent.model.save('models/rlmodel')
 
             # Decay epsilon
@@ -452,4 +505,4 @@ if __name__ == '__main__':
     # Set termination flag for training thread and wait for it to finish
     agent.terminate = True
     trainer_thread.join()
-    agent.model.save('models/rlmodel')
+    # agent.model.save('models/rlmodel')

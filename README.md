@@ -30,7 +30,7 @@ Best Trained policy:
 https://drive.google.com/file/d/15gvw7sJG5bHWrBxXhyx4UzRxd7rhfx9-/view?usp=sharing
 
 DQN algorithms:
-he target pipeline is to make spawned vehicle learn the environment and drive itself without collide under no traffic or line following rules. To save the randomness time, guided waypoints are generated near the spawned location and add them to reward function. 
+The target pipeline is to make spawned vehicle learn the environment and drive itself without collide under no traffic or line following rules. To save the randomness time, guided waypoints are generated near the spawned location and add them to reward function. 
 
 Rewards:
 Reward policy1: give huge penalty to collision (around -200 to 500)
